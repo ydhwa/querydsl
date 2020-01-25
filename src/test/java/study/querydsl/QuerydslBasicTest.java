@@ -4,7 +4,6 @@ import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.QueryResults;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.ExpressionUtils;
-import com.querydsl.core.types.Predicate;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.CaseBuilder;
@@ -15,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.Commit;
 import org.springframework.transaction.annotation.Transactional;
 import study.querydsl.dto.MemberDto;
 import study.querydsl.dto.QMemberDto;
@@ -645,5 +645,52 @@ public class QuerydslBasicTest {
     // ex) 광고 상태 isValid, 날짜가 IN: isServiceable
     private BooleanExpression allEq(String usernameCond, Integer ageCond) {
         return usernameEq(usernameCond).and(ageEq(ageCond));
+    }
+
+    @Test
+    @Commit
+    public void bulkUpdate() throws Exception {
+        // member1 = 10 -> 1 DB member1
+        // member2 = 20 -> 2 DB member2
+        // member3 = 30 -> 3 DB member3
+        // member4 = 40 -> 3 DB member4
+        long count = queryFactory
+                .update(member)
+                .set(member.username, "비회원")
+                .where(member.age.lt(28))
+                .execute();
+
+        // repeatable read 방지
+        em.flush();
+        em.clear();
+
+        // 1 member1 = 10 -> 1 DB 비회원
+        // 2 member2 = 20 -> 2 DB 비회원
+        // 3 member3 = 30 -> 3 DB member3
+        // 4 member4 = 40 -> 4 DB member4
+        List<Member> result = queryFactory
+                .selectFrom(member)
+                .fetch();
+
+        for (Member member : result) {
+            System.out.println("member = " + member);
+        }
+    }
+
+    @Test
+    public void bulkAdd() throws Exception {
+        long count = queryFactory
+                .update(member)
+                .set(member.age, member.age.add(1))
+//                .set(member.age, member.age.multiply(2))
+                .execute();
+    }
+    
+    @Test
+    public void bulkDelete() throws Exception {
+        long count = queryFactory
+                .delete(member)
+                .where(member.age.gt(18))
+                .execute();
     }
 }
